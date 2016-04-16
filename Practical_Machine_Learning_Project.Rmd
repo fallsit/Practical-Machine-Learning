@@ -1,0 +1,80 @@
+---
+title: "Practical Machine Learning Project"
+author: "fallsit"
+date: "2016年4月12日"
+output: html_document
+---
+##Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+##load the data
+```{r echo=TRUE}
+library(ggplot2)
+library(caret)
+library(randomForest)
+trainurl<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testurl<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training <- read.csv(trainurl, na.strings=c("NA","#DIV/0!",""))
+testing<- read.csv(testurl,na.strings=c("NA","#DIV/0!",""))
+dim(training)
+dim(testing)
+
+barplot(table(training$classe),xlab="classe levels",ylab="Frequency",main="Classes")
+```
+The training data has 19622 rows of observations and 160 features (predictors).The "classe" is a factor with 5 levels from A->E.
+
+##Data cleaning
+First, we remove the columns that contain NA value
+```{r recho=TRUE}
+train=training[,colSums(is.na(training))==0]
+test=testing[,colSums(is.na(testing))==0]
+```
+Secoond, we remove the columns which do not useful.
+```{r recho=TRUE}
+classe <- train$classe
+trainRemove <- grepl("^X|timestamp|window", names(train))
+train <- train[, !trainRemove]
+trainCleaned <- train[, sapply(train, is.numeric)]
+trainCleaned$classe <- classe
+testRemove <- grepl("^X|timestamp|window", names(test))
+test <- test[, !testRemove]
+testCleaned <- test[, sapply(test, is.numeric)]
+dim(trainCleaned)
+dim(testCleaned)
+```
+The training data set have 19622 observations & 53 variables.
+The testing data set have 20 observations & 53 variables.
+
+##Split the data
+We separate our training data set into a training set(80%) and a validation set(20%) .
+```{r echo=TRUE}
+set.seed(102)
+inTrain <- createDataPartition(trainCleaned$classe, p=0.80, list=F)
+trainset <- trainCleaned[inTrain, ]
+testset <- trainCleaned[-inTrain, ]
+```
+
+##Model train dataset
+We using Random Forest algorithm because it is much more robust & accuracies
+```{r echo=TRUE}
+model<-randomForest(classe~.,data=trainset,importance=TRUE,ntrees=10)
+```
+Test the training set and the cross validation set.
+```{r echo=TRUE}
+ptraining <- predict(model, trainset)
+print(confusionMatrix(ptraining, trainset$classe))
+```
+The model performs so great against the training set, and let us see the model performs on the cross validation set.
+```{r echo=TRUE}
+ptesting <- predict(model, testset)
+print(confusionMatrix(ptesting, testset$classe))
+oose <- 1 - as.numeric(confusionMatrix(testset$classe, ptesting)$overall[1])
+oose
+```
+The cross validation accuracy is 99.52% and the estimated out-of-sample error is 0.5%.
+
+```{r echo=TRUE}
+result <- predict(model, test)
+result
+```
+
